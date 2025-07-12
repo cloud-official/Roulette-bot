@@ -1,0 +1,25 @@
+name: roulette-hub-bot
+
+on:
+  push:
+    branches: [ main ]   # or your default branch
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'  # or your bot's Node version
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run bot
+      env:
+        TOKEN: ${{ secrets.TOKEN }}
+      run: node index.js
