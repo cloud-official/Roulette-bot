@@ -1,10 +1,20 @@
-const express = require('express');
-const app = express();
-app.get('/', (req, res) => res.send('The bot is online'));
-app.listen(3000, () => console.log('✅ Web server started'));
+require("dotenv").config();
 
-const { Client, GatewayIntentBits } = require('discord.js');
-const ms = require('ms'); // for parsing durations like "10m", "1h"
+const express = require("express");
+const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
+const fetch = require("node-fetch");
+const PingMonitor = require("./ping_monitor.js");
+const UptimeMonitor = require("./uptime_monitor.js");
+
+// Keep alive server
+require("./keep_alive.js");
+
+// Main API server
+const app = express();
+app.get("/", (req, res) => res.send("âœ¨ Roulette Hub API is up âœ¨"));
+app.listen(3000, () => console.log("Â·:*Â¨à¼º â™± ROULETTE HUB ONLINE â™± à¼»Â¨*:Â·"));
+
+// Discord client
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -14,248 +24,441 @@ const client = new Client({
   ],
 });
 
-client.on('ready', () => {
-  console.log(`🤖 Logged in as ${client.user.tag}`);
+// Initialize monitors
+const pingMonitor = new PingMonitor();
+const uptimeMonitor = new UptimeMonitor(client);
+
+// Emoji URLs (orange version)
+const EMOJIS = {
+  script: "https://img.icons8.com/?size=100&id=37927&format=png&color=FFA500",
+  key: "https://img.icons8.com/?size=100&id=2896&format=png&color=FFA500",
+  about:
+    "https://img.icons8.com/?size=100&id=dbEL2NLmlcac&format=png&color=FFA500",
+  help: "https://img.icons8.com/?size=100&id=E4FAF4hA9ugF&format=png&color=FFA500",
+  clear: "https://img.icons8.com/?size=100&id=109408&format=png&color=FFA500",
+  ban: "https://img.icons8.com/?size=100&id=BzwPdJnDmzEx&format=png&color=FFA500",
+  kick: "https://img.icons8.com/?size=100&id=71285&format=png&color=FFA500",
+  mute: "https://img.icons8.com/?size=100&id=644&format=png&color=FFA500",
+};
+
+// Adlink bypasser function (no API key needed)
+async function bypassAdlink(url) {
+  try {
+    // Use pure JS solution - works for most common adlink services
+    const proxyUrl = `https://api.bypass.vip/?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+
+    if (data && data.destination) {
+      return data.destination;
+    }
+
+    // Fallback method if first one fails
+    const fallbackResponse = await fetch(
+      `https://bypass.pm/bypass2?url=${encodeURIComponent(url)}`,
+    );
+    const fallbackData = await fallbackResponse.json();
+
+    return fallbackData.destination || url; // Return original if all fails
+  } catch (error) {
+    console.error("Bypass error:", error);
+    return url; // Return original URL if error occurs
+  }
+}
+
+client.on("ready", () => {
+  console.log(`ðŸ›°ï¸ Bot Ready â€” Logged in as ${client.user.tag}`);
+  client.user.setActivity(">help | ðŸ’» Executing scripts", { type: "PLAYING" });
+
+  // Setup default uptime monitoring for your services
+  uptimeMonitor.setupDefaultServices();
 });
 
-client.on('messageCreate', async (message) => {
-  if (message.author.bot) return;
-  if (!message.guild) return; // ignore DMs
+client.on("messageCreate", async (message) => {
+  if (message.author.bot || !message.guild) return;
+  if (!message.content.startsWith(">")) return;
 
-  const content = message.content.trim();
-  const args = content.split(/ +/);
+  const args = message.content.slice(1).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  // Role for restricted commands — replace '???' with your actual role name
-  const restrictedRole = message.guild.roles.cache.find((r) => r.name === '???');
-  const hasPermission = restrictedRole && message.member.roles.cache.has(restrictedRole.id);
+  // PUBLIC COMMANDS
+  if (command === "script") {
+    const rawUrl =
+      "https://rawscripts.net/raw/Universal-Script-Best-Universal-hub-44327";
+    const cleanUrl = await bypassAdlink(rawUrl);
 
-  // === COMMAND LIST (simple) ===
-  if (command === 'commands') {
-    return message.reply({
-      content: `📜 **Command List**:
-\`script\` - Get script link  
-\`key\` - Get key link  
-\`about\` - Info about the bot  
-\`spam <msg> <count>\` - Spam message (role: ???)  
-\`clear <amount>\` - Delete messages (role: ???)  
-\`kick @user <reason>\` - Kick user (role: ???)  
-\`ban @user <reason>\` - Ban user (role: ???)  
-\`mute @user <duration>\` - Mute user (role: ???)`
-    });
+    const embed = new EmbedBuilder()
+      .setTitle("Roulette Hub")
+      .setDescription("this month we added air....")
+      .setURL(cleanUrl)
+      .setThumbnail(EMOJIS.script)
+      .setColor(0x2ecc71);
+    return message.reply({ embeds: [embed] });
   }
 
-  // === FULL ORGANIZED COMMANDS ===
-  if (command === 'one') {
-    return message.reply({
-      content: `📚 **All Commands - Organized**
+  if (command === "key") {
+    const keyUrl =
+      "https://discord.com/channels/1388707547061551274/1388737749015855184/1391981489335439481";
+    const cleanKeyUrl = await bypassAdlink(keyUrl);
 
-**Public Commands:**
-• \`script\` - Get script link
-• \`key\` - Get key link
-• \`about\` - Bot info
-• \`ping\` - Check bot latency
-• \`userinfo @user\` - Get info about a user
-• \`serverinfo\` - Get info about the server
-
-**Restricted Commands (Role: ???):**
-• \`spam <message> <count>\` - Spam messages (max 10000)
-• \`clear <amount>\` - Delete messages (1–10000)
-• \`kick @user <reason>\` - Kick a user
-• \`ban @user <reason>\` - Ban a user
-• \`mute @user <duration>\` - Mute a user (e.g. 10m, 1h)
-• \`unmute @user\` - Remove mute from a user`
-    });
+    const embed = new EmbedBuilder()
+      .setTitle("Key System")
+      .setDescription("ðŸ”‘ Grab your key For Roulette Hub.")
+      .setURL(cleanKeyUrl)
+      .setThumbnail(EMOJIS.key)
+      .setColor(0xf1c40f);
+    return message.reply({ embeds: [embed] });
   }
 
-  // === PUBLIC COMMANDS ===
-  if (command === 'script') {
-    return message.reply('📜 https://rawscripts.net/raw/Universal-Script-Best-Universal-hub-44327');
+  if (command === "about") {
+    const embed = new EmbedBuilder()
+      .setTitle("About This Bot")
+      .setDescription(
+        "Bot by `@fevber`.\nðŸŽ¯ script server also rope ur self and cut ur head off until it bleeds.",
+      )
+      .setThumbnail(EMOJIS.about)
+      .setColor(0x3498db);
+    return message.reply({ embeds: [embed] });
   }
 
-  if (command === 'key') {
-    return message.reply('🔑 https://discord.com/channels/1388707547061551274/1388737749015855184/1391981489335439481');
+  if (command === "help") {
+    const embed = new EmbedBuilder()
+      .setTitle("Help Menu")
+      .setDescription(
+        `ðŸ§  Here are the available commands:
+
+\`>script\` â€” Latest universal script  
+\`>key\` â€” Key system link  
+\`>about\` â€” About the bot  
+\`>status\` â€” Bot and server status  
+\`>support\` â€” Get help  
+\`>repeat <message>\` â€” Echoes your message
+
+ðŸ“¡ **Ping Monitoring:**
+\`>ping-add <host> [name]\` â€” Add ping monitor
+\`>ping-remove <name>\` â€” Remove ping monitor  
+\`>ping-status [name]\` â€” Check monitor status
+
+ðŸŽ¯ **Uptime Monitoring:**
+\`>uptime-add <url> [name]\` â€” Add uptime monitor
+\`>uptime-remove <name>\` â€” Remove uptime monitor  
+\`>uptime-status [name]\` â€” Check uptime status
+\`>uptime-alerts <#channel>\` â€” Set alert channel
+
+ðŸ”’ Locked Commands (Role: \`???\`):  
+\`>delete-server\`  \`>clear\`  \`>ban\`  \`>kick\`  \`>mute\`  \`>spam\``,
+      )
+      .setThumbnail(EMOJIS.help)
+      .setColor(0x9b59b6);
+    return message.reply({ embeds: [embed] });
   }
 
-  if (command === 'about') {
-    return message.reply('🤖 Created by @fevber. This bot is for educational use.');
+  if (command === "status") {
+    const uptimeSeconds = Math.floor(process.uptime());
+    const embed = new EmbedBuilder()
+      .setTitle("Roulette Hub Status")
+      .setDescription(
+        `ðŸ“¡ Bot is online as **${client.user.tag}**  
+ðŸ§  Uptime: **${uptimeSeconds}s**  
+ðŸŒ Host: Replit / Node.js  
+ðŸ“¶ Ping: **${client.ws.ping}ms**`,
+      )
+      .setColor(0x1abc9c);
+    return message.reply({ embeds: [embed] });
   }
 
-  if (command === 'ping') {
-    return message.reply(`🏓 Pong! Latency is ${Date.now() - message.createdTimestamp}ms.`);
+  if (command === "support") {
+    const embed = new EmbedBuilder()
+      .setTitle("Support")
+      .setDescription(
+        "ðŸ› ï¸ Need help? Ping `@staff` or visit our support channel: https://discord.com/channels/1388707547061551274/1392209093598515252/1395955183770406944 ",
+      )
+      .setColor(0xe67e22);
+    return message.reply({ embeds: [embed] });
   }
 
-  if (command === 'userinfo') {
-    const user = message.mentions.users.first() || message.author;
-    const member = message.guild.members.cache.get(user.id);
-
-    const created = user.createdAt.toDateString();
-    const joined = member ? member.joinedAt.toDateString() : 'N/A';
-
-    return message.reply({
-      content: `👤 **User Info**
-• Username: ${user.tag}
-• ID: ${user.id}
-• Created on: ${created}
-• Joined server: ${joined}`
-    });
+  if (command === "repeat") {
+    const msg = args.join(" ");
+    if (!msg)
+      return message.reply("ðŸ—£ï¸ You need to provide a message to repeat.");
+    return message.channel.send(msg);
   }
 
-  if (command === 'serverinfo') {
-    const { guild } = message;
-    return message.reply({
-      content: `🏰 **Server Info**
-• Name: ${guild.name}
-• ID: ${guild.id}
-• Members: ${guild.memberCount}
-• Created on: ${guild.createdAt.toDateString()}`
-    });
-  }
+  if (command === "ping-add") {
+    const host = args[0];
+    const name = args[1] || host;
 
-  // === RESTRICTED COMMANDS CHECK ===
-  if (['spam', 'clear', 'kick', 'ban', 'mute', 'unmute'].includes(command) && !hasPermission) {
-    return message.reply('🚫 You don’t have permission to use this command.');
-  }
-
-  // === SPAM ===
-  if (command === 'spam') {
-    const count = parseInt(args[args.length - 1], 10);
-    const msg = args.slice(0, -1).join(' ');
-
-    if (!msg || isNaN(count) || count < 1 || count > 10000) {
-      return message.reply('⚠️ Usage: `spam <message> <count>` (Max: 10000)');
+    if (!host) {
+      return message.reply("âŒ Usage: `>ping-add <host/ip> [friendly_name]`");
     }
 
-    // Helper to wait for ms milliseconds
-    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const result = pingMonitor.addMonitor(name, host);
+    const embed = new EmbedBuilder()
+      .setTitle(result.success ? "âœ… Monitor Added" : "âŒ Error")
+      .setDescription(result.message)
+      .setColor(result.success ? 0x2ecc71 : 0xe74c3c);
 
-    for (let i = 0; i < count; i++) {
-      await message.channel.send(msg).catch(() => {});
-      await wait(1000); // wait 1 second between messages
-    }
+    return message.reply({ embeds: [embed] });
   }
 
-  // === CLEAR ===
-  else if (command === 'clear') {
-    const amount = parseInt(args[0], 10);
-    if (isNaN(amount) || amount < 1 || amount > 10000) {
-      return message.reply('⚠️ Usage: `clear <amount>` (1–10000)');
+  if (command === "ping-remove") {
+    const name = args[0];
+    if (!name) {
+      return message.reply("âŒ Usage: `>ping-remove <monitor_name>`");
     }
 
-    try {
-      await message.channel.bulkDelete(amount, true);
-      const replyMsg = await message.channel.send(`🧹 Deleted ${amount} messages.`);
-      setTimeout(() => replyMsg.delete().catch(() => {}), 3000);
-    } catch {
-      message.reply('❗ Failed to delete messages. Make sure messages are not older than 14 days.');
-    }
+    const result = pingMonitor.removeMonitor(name);
+    const embed = new EmbedBuilder()
+      .setTitle(result.success ? "âœ… Monitor Removed" : "âŒ Error")
+      .setDescription(result.message)
+      .setColor(result.success ? 0x2ecc71 : 0xe74c3c);
+
+    return message.reply({ embeds: [embed] });
   }
 
-  // === KICK ===
-  else if (command === 'kick') {
-    const user = message.mentions.members.first();
-    const reason = args.slice(1).join(' ') || 'No reason';
+  if (command === "ping-status") {
+    const name = args[0];
 
-    if (!user) return message.reply('❗ Mention a user to kick.');
-    if (!user.kickable) return message.reply('❗ Cannot kick this user.');
-
-    try {
-      await user.kick(reason);
-      message.channel.send(`👢 Kicked ${user.user.tag} | Reason: ${reason}`);
-    } catch {
-      message.reply('❗ Failed to kick user. Check bot permissions and role hierarchy.');
-    }
-  }
-
-  // === BAN ===
-  else if (command === 'ban') {
-    const user = message.mentions.members.first();
-    const reason = args.slice(1).join(' ') || 'No reason';
-
-    if (!user) return message.reply('❗ Mention a user to ban.');
-    if (!user.bannable) return message.reply('❗ Cannot ban this user.');
-
-    try {
-      await user.ban({ reason });
-      message.channel.send(`🔨 Banned ${user.user.tag} | Reason: ${reason}`);
-    } catch {
-      message.reply('❗ Failed to ban user. Check bot permissions and role hierarchy.');
-    }
-  }
-
-  // === MUTE ===
-  else if (command === 'mute') {
-    const user = message.mentions.members.first();
-    const durationStr = args[1]; // e.g. '10m', '1h'
-    if (!user) return message.reply('❗ Mention a user to mute.');
-    if (!durationStr) return message.reply('❗ Please specify duration, e.g. `mute @user 10m`');
-
-    // Find or create "Muted" role
-    let muteRole = message.guild.roles.cache.find((r) => r.name === 'Muted');
-    if (!muteRole) {
-      try {
-        muteRole = await message.guild.roles.create({
-          name: 'Muted',
-          color: '#555555',
-          permissions: [],
-        });
-
-        // Deny send messages permission in all channels for the muted role
-        for (const [, channel] of message.guild.channels.cache) {
-          await channel.permissionOverwrites.edit(muteRole, {
-            SendMessages: false,
-            Speak: false,
-            AddReactions: false,
-          });
-        }
-      } catch (e) {
-        console.error('Failed to create Muted role:', e);
-        return message.reply('❗ Failed to create Muted role, please check bot permissions.');
+    if (name) {
+      const result = pingMonitor.getMonitorStatus(name);
+      if (!result.success) {
+        return message.reply("âŒ Monitor not found");
       }
+
+      const data = result.data;
+      const statusIcon = data.status === "up" ? "ðŸŸ¢" : "ðŸ”´";
+
+      const embed = new EmbedBuilder()
+        .setTitle(`${statusIcon} ${data.name} Status`)
+        .setDescription(
+          `**Host:** ${data.host}
+**Status:** ${data.status.toUpperCase()}
+**Uptime:** ${data.uptime}
+**Response Time:** ${data.responseTime}
+**Last Check:** ${data.lastCheck ? data.lastCheck.toLocaleString() : "Never"}
+**Total Checks:** ${data.totalChecks}
+**Success Rate:** ${data.successfulChecks}/${data.totalChecks}`,
+        )
+        .setColor(data.status === "up" ? 0x2ecc71 : 0xe74c3c);
+
+      return message.reply({ embeds: [embed] });
     }
 
-    if (user.roles.cache.has(muteRole.id)) {
-      return message.reply('❗ User is already muted.');
+    const monitors = pingMonitor.getAllMonitors();
+    if (monitors.length === 0) {
+      return message.reply(
+        "ðŸ“¡ No monitors configured. Use `>ping-add <host>` to add one.",
+      );
     }
 
-    const durationMs = ms(durationStr);
-    if (!durationMs) return message.reply('❗ Invalid duration format. Use formats like 10m, 1h, 30s.');
+    let description = "";
+    monitors.forEach((monitor) => {
+      const statusIcon = monitor.status === "up" ? "ðŸŸ¢" : "ðŸ”´";
+      description += `${statusIcon} **${monitor.name}** (${monitor.host}) - ${monitor.uptime} uptime\n`;
+    });
 
-    try {
-      await user.roles.add(muteRole);
-      message.channel.send(`🔇 Muted ${user.user.tag} for ${durationStr}`);
+    const embed = new EmbedBuilder()
+      .setTitle("ðŸ“¡ Ping Monitor Status")
+      .setDescription(description)
+      .setColor(0x3498db);
 
-      // Auto unmute after duration
-      setTimeout(async () => {
-        if (user.roles.cache.has(muteRole.id)) {
-          await user.roles.remove(muteRole).catch(() => {});
-          message.channel.send(`🔈 Unmuted ${user.user.tag} (mute expired)`);
-        }
-      }, durationMs);
-    } catch (e) {
-      console.error(e);
-      return message.reply('❗ Failed to mute the user, check bot permissions and role hierarchy.');
-    }
+    return message.reply({ embeds: [embed] });
   }
 
-  // === UNMUTE ===
-  else if (command === 'unmute') {
-    if (!hasPermission) return message.reply('🚫 You don’t have permission to use this command.');
-    const user = message.mentions.members.first();
-    if (!user) return message.reply('❗ Mention a user to unmute.');
+  if (command === "uptime-add") {
+    const url = args[0];
+    const name = args[1] || url;
 
-    const muteRole = message.guild.roles.cache.find(r => r.name === 'Muted');
-    if (!muteRole || !user.roles.cache.has(muteRole.id)) {
-      return message.reply('❗ User is not muted.');
+    if (!url) {
+      return message.reply("âŒ Usage: `>uptime-add <url> [friendly_name]`");
     }
 
+    const result = uptimeMonitor.addService(name, url);
+    const embed = new EmbedBuilder()
+      .setTitle(result.success ? "âœ… Uptime Monitor Added" : "âŒ Error")
+      .setDescription(result.message)
+      .setColor(result.success ? 0x2ecc71 : 0xe74c3c);
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  if (command === "uptime-remove") {
+    const name = args[0];
+    if (!name) {
+      return message.reply("âŒ Usage: `>uptime-remove <service_name>`");
+    }
+
+    const result = uptimeMonitor.removeService(name);
+    const embed = new EmbedBuilder()
+      .setTitle(result.success ? "âœ… Uptime Monitor Removed" : "âŒ Error")
+      .setDescription(result.message)
+      .setColor(result.success ? 0x2ecc71 : 0xe74c3c);
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  if (command === "uptime-alerts") {
+    const channel = message.mentions.channels.first();
+    if (!channel) {
+      return message.reply("âŒ Usage: `>uptime-alerts <#channel>`");
+    }
+
+    uptimeMonitor.setNotificationChannel(channel.id);
+    const embed = new EmbedBuilder()
+      .setTitle("âœ… Alert Channel Set")
+      .setDescription(`Uptime alerts will be sent to ${channel}`)
+      .setColor(0x2ecc71);
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  if (command === "uptime-status") {
+    const name = args[0];
+
+    if (name) {
+      const result = uptimeMonitor.getServiceStatus(name);
+      if (!result.success) {
+        return message.reply("âŒ Service not found");
+      }
+
+      const data = result.data;
+      const statusIcon = data.status === "up" ? "ðŸŸ¢" : "ðŸ”´";
+
+      const embed = new EmbedBuilder()
+        .setTitle(`${statusIcon} ${data.name} Uptime Status`)
+        .setDescription(
+          `**URL:** ${data.url}
+**Status:** ${data.status.toUpperCase()}
+**Uptime:** ${data.uptime}
+**Response Time:** ${data.responseTime}
+**Last Check:** ${data.lastCheck ? data.lastCheck.toLocaleString() : "Never"}
+**Total Checks:** ${data.totalChecks}
+**Successful:** ${data.successfulChecks}/${data.totalChecks}
+**Last Downtime:** ${data.lastDowntime ? data.lastDowntime.toLocaleString() : "Never"}`,
+        )
+        .setColor(data.status === "up" ? 0x2ecc71 : 0xe74c3c);
+
+      return message.reply({ embeds: [embed] });
+    }
+
+    const services = uptimeMonitor.getAllServices();
+    if (services.length === 0) {
+      return message.reply(
+        "ðŸŽ¯ No uptime monitors configured. Use `>uptime-add <url>` to add one.",
+      );
+    }
+
+    let description = "";
+    services.forEach((service) => {
+      const statusIcon = service.status === "up" ? "ðŸŸ¢" : "ðŸ”´";
+      description += `${statusIcon} **${service.name}** - ${service.uptime} uptime (${service.responseTime})\n`;
+    });
+
+    const embed = new EmbedBuilder()
+      .setTitle("ðŸŽ¯ Uptime Monitor Status")
+      .setDescription(description)
+      .setColor(0x3498db);
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  // RESTRICTED COMMANDS
+  const restrictedRole = message.guild.roles.cache.find(
+    (r) => r.name === "???",
+  );
+  if (!restrictedRole) return;
+
+  if (!message.member.roles.cache.has(restrictedRole.id)) return;
+
+  if (command === "delete-server") {
+    const embed = new EmbedBuilder()
+      .setTitle("Shutdown")
+      .setDescription(
+        "âš ï¸ Shutdown sequence initiated... (nah you ain't deleting ðŸ’€)",
+      )
+      .setColor(0xe74c3c);
+    return message.reply({ embeds: [embed] });
+  }
+
+  if (command === "clear") {
     try {
-      await user.roles.remove(muteRole);
-      message.channel.send(`🔈 Unmuted ${user.user.tag}`);
+      await message.channel.bulkDelete(1000, true);
+      const embed = new EmbedBuilder()
+        .setTitle("Messages Cleared")
+        .setDescription("ðŸ§½ Last 1000 messages deleted.")
+        .setThumbnail(EMOJIS.clear)
+        .setColor(0x95a5a6);
+      return message.channel.send({ embeds: [embed] });
     } catch {
-      message.reply('❗ Failed to unmute user. Check bot permissions and role hierarchy.');
+      return message.channel.send("âŒ Failed to clear messages.");
     }
   }
+
+  if (command === "ban") {
+    const target = message.mentions.members.first();
+    if (!target) return message.reply("Mention someone to ban.");
+    try {
+      await target.ban({ reason: `Banned by ${message.author.tag}` });
+      const embed = new EmbedBuilder()
+        .setTitle("User Banned")
+        .setDescription(`ðŸ”¨ Banned **${target.user.tag}**`)
+        .setThumbnail(EMOJIS.ban)
+        .setColor(0xe74c3c);
+      return message.channel.send({ embeds: [embed] });
+    } catch {
+      return message.reply("âŒ Could not ban that user.");
+    }
+  }
+
+  if (command === "kick") {
+    const target = message.mentions.members.first();
+    if (!target) return message.reply("ðŸ” Mention someone to kick.");
+    try {
+      await target.kick("Kicked by command");
+      const embed = new EmbedBuilder()
+        .setTitle("User Kicked")
+        .setDescription(`ðŸ¥¾ Kicked **${target.user.tag}**`)
+        .setThumbnail(EMOJIS.kick)
+        .setColor(0xe67e22);
+      return message.channel.send({ embeds: [embed] });
+    } catch {
+      return message.reply("âŒ Could not kick that user.");
+    }
+  }
+
+  if (command === "mute") {
+    const target = message.mentions.members.first();
+    if (!target) return message.reply("Mention someone to mute.");
+    try {
+      await target.timeout(100 * 600 * 1000, "Muted by command");
+      const embed = new EmbedBuilder()
+        .setTitle("User Muted")
+        .setDescription(`Muted **${target.user.tag}** for 100 minutes`)
+        .setThumbnail(EMOJIS.mute)
+        .setColor(0xf39c12);
+      return message.channel.send({ embeds: [embed] });
+    } catch {
+      return message.reply("âŒ Could not mute that user.");
+    }
+  }
+
+  if (command === "spam") {
+    const target = message.mentions.members.first();
+    if (!target) return message.reply("ðŸš¨ Mention a user to spam.");
+    for (let i = 0; i < 5; i++) {
+      await message.channel.send(`ðŸ’¥ Spam #${i + 1} â†’ ${target}`);
+    }
+    return;
+  }
+});
+
+// Graceful shutdown
+process.on("SIGINT", () => {
+  console.log("ðŸ”„ Shutting down gracefully...");
+  pingMonitor.stopAllMonitors();
+  uptimeMonitor.stopAllMonitoring();
+  client.destroy();
+  process.exit(0);
 });
 
 client.login(process.env.TOKEN);
